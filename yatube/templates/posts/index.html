@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block main %}
+{% load cache %}
+{% include 'posts/includes/switcher.html' %}
+{% cache 20 index_page %}
+  {% for post in page_obj %}
+    {% include 'includes/post_card.html' %}
+  {% endfor %}
+{% endcache %}
+{% include 'posts/includes/paginator.html' %}
+{% endblock main %}
