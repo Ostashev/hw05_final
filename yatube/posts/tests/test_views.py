@@ -1,8 +1,9 @@
 import shutil
 import tempfile
+
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
-
+from django.core.cache import cache
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 from django.urls import reverse
@@ -120,6 +121,7 @@ class PostPagesTest(TestCase):
             response.context.get('post').text: self.post.text,
             response.context.get('post').author: self.post.author,
             response.context.get('post').group: self.post.group,
+            response.context.get('post').image: self.post.image,
         }
         for field, expected_value in field_context.items():
             with self.subTest(field=field):
@@ -147,6 +149,7 @@ class PostPagesTest(TestCase):
         form_fields = {
             'text': forms.fields.CharField,
             'group': forms.models.ModelChoiceField,
+            'image': forms.fields.ImageField,
         }
         for value, expected in form_fields.items():
             with self.subTest(value=value):
@@ -184,7 +187,7 @@ class PostPagesTest(TestCase):
         self.assertNotIn(post_new, Post.objects.filter(group=self.group_new))
 
     def test_comment_on_post_page(self):
-        """Валидная форма Комментария создает запись в Post"""
+        """Комментариq создаетcя к Post и перенаправляет на post_detail"""
         comment_count = Comment.objects.count()
         form_data = {'text': 'Тестовый комментарий 2'}
         response = self.authorized_client.post(reverse(
@@ -203,16 +206,19 @@ class PostPagesTest(TestCase):
 
     def test_check_cache(self):
         """Проверка кеша."""
-        response = self.authorized_client.get(reverse("posts:index"))
+        response = self.authorized_client.get(reverse('posts:index'))
         cache_1 = response.content
         Post.objects.get(id=1).delete()
-        response2 = self.authorized_client.get(reverse("posts:index"))
+        response2 = self.authorized_client.get(reverse('posts:index'))
         cache_2 = response2.content
         self.assertEqual(cache_1, cache_2)
+        cache.clear()
+        response3 = self.authorized_client.get(reverse('posts:index'))
+        cache_3 = response3.content
+        self.assertNotEqual(cache_1, cache_3)
 
     def test_follow_authorized_page_index(self):
         """Проверка подписки авторизованного пользователя и вывод поста"""
-        self.assertEqual(Follow.objects.count(), 0)
         self.authorized_client_2.get(reverse(
             'posts:profile_follow',
             kwargs={'username': self.user.username}
@@ -221,10 +227,13 @@ class PostPagesTest(TestCase):
         response_follower = self.authorized_client_2.get(reverse(
             'posts:follow_index'
         ))
+        self.assertIn(self.post, response_follower.context["page_obj"])
+
+    def test_not_follow_authorized_page_index(self):
+        """Проверка подписки автора поста на автора поста"""
         response_not_follower = self.authorized_client.get(reverse(
             'posts:follow_index'
         ))
-        self.assertIn(self.post, response_follower.context["page_obj"])
         self.assertNotIn(self.post, response_not_follower.context["page_obj"])
 
     def test_unfollow_authorized(self):
@@ -238,6 +247,36 @@ class PostPagesTest(TestCase):
             kwargs={'username': self.user.username}
         ))
         self.assertEqual(Follow.objects.count(), 0)
+
+    def test_image_context_index(self):
+        """Картинка передается на страницу index"""
+        response = self.authorized_client.get(reverse('posts:index'))
+        obj = response.context['page_obj'][0]
+        self.assertEqual(obj.image, self.post.image)
+
+    def test_image_context_profile(self):
+        """Картинка передается на страницу profile"""
+        response = self.authorized_client.get(
+            reverse('posts:profile', kwargs={'username': self.user.username})
+        )
+        obj = response.context['page_obj'][0]
+        self.assertEqual(obj.image, self.post.image)
+
+    def test_image_context_group_list(self):
+        """Картинка передается на страницу group_list"""
+        response = self.authorized_client.get(
+            reverse('posts:group_list', kwargs={'slug': self.group.slug})
+        )
+        obj = response.context['page_obj'][0]
+        self.assertEqual(obj.image, self.post.image)
+
+    def test_image_context_post_detail(self):
+        """Картинка передается на страницу post_detail"""
+        response = self.authorized_client.get(
+            reverse('posts:post_detail', kwargs={'post_id': self.post.id})
+        )
+        obj = response.context['post']
+        self.assertEqual(obj.image, self.post.image)
 
 
 class PaginatorViewsTest(TestCase):

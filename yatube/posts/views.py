@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.shortcuts import redirect
 from django.contrib.auth.decorators import login_required
 
-from .models import Post, Group, Comment, Follow
+from .models import Post, Group, Follow
 from .forms import PostForm, CommentForm
 from .utils import get_page_obj
 
@@ -34,12 +34,13 @@ def profile(request, username):
     author = get_object_or_404(User, username=username)
     post_list = author.posts.select_related('author', 'group')
     page_obj = get_page_obj(request, post_list)
-    # following = author.following.exists()
-    following = False
-    if ((request.user.is_authenticated)
+    following = (
+        request.user.is_authenticated
         and Follow.objects.filter(
-            user=request.user, author=author).exists()):
-        following = True
+            user=request.user,
+            author=author,
+        ).exists()
+    )
     context = {
         'username': username,
         'author': author,
@@ -52,7 +53,7 @@ def profile(request, username):
 def post_detail(request, post_id):
     form = CommentForm(request.POST or None)
     post = get_object_or_404(Post, pk=post_id)
-    comments = Comment.objects.filter(post=post)
+    comments = post.comments.filter(post=post)
     context = {
         'post_id': post_id,
         'post': post,
@@ -108,11 +109,8 @@ def add_comment(request, post_id):
 
 @login_required
 def follow_index(request):
-    # Страница подписок
-    follower = Follow.objects.filter(user=request.user).values_list(
-        "author_id", flat=True
-    )
-    post_list = Post.objects.filter(author_id__in=follower)
+    """Страница подписок"""
+    post_list = Post.objects.filter(author__following__user=request.user)
     page_obj = get_page_obj(request, post_list)
     context = {
         'page_obj': page_obj,
@@ -122,17 +120,18 @@ def follow_index(request):
 
 @login_required
 def profile_follow(request, username):
-    # Подписка
+    """Подписка"""
     author = get_object_or_404(User, username=username)
     if author != request.user:
         Follow.objects.get_or_create(user=request.user, author=author)
-    return redirect('posts:follow_index')
+    return redirect('posts:profile', username=username)
 
 
 @login_required
 def profile_unfollow(request, username):
-    # Отписка
+    """Отписка"""
     author = get_object_or_404(User, username=username)
     if author != request.user:
-        Follow.objects.get(user=request.user, author=author).delete()
+        if Follow.objects.get_or_create(user=request.user, author=author):
+            Follow.objects.get(user=request.user, author=author).delete()
     return redirect('posts:follow_index')

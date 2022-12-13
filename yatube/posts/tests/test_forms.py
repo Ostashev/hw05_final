@@ -1,8 +1,8 @@
 import shutil
 import tempfile
+
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
-
 from django.test import TestCase, Client, override_settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
