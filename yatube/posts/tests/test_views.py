@@ -62,6 +62,10 @@ class PostPagesTest(TestCase):
             author=cls.user,
             post=cls.post
         )
+        cls.follow = Follow.objects.create(
+            user=cls.user_2,
+            author=cls.user,
+        )
 
     def setUp(self):
         self.authorized_client = Client()
@@ -224,13 +228,20 @@ class PostPagesTest(TestCase):
             kwargs={'username': self.user.username}
         ))
         self.assertEqual(Follow.objects.count(), 1)
+
+    def test_follow_post_page_index(self):
+        """Проверка вывода поста после подписки"""
         response_follower = self.authorized_client_2.get(reverse(
             'posts:follow_index'
         ))
-        self.assertIn(self.post, response_follower.context["page_obj"])
+        self.assertIn(self.post, response_follower.context['page_obj'])
 
     def test_not_follow_authorized_page_index(self):
         """Проверка подписки автора поста на автора поста"""
+        self.authorized_client.get(reverse(
+            'posts:profile_follow',
+            kwargs={'username': self.user.username}
+        ))
         response_not_follower = self.authorized_client.get(reverse(
             'posts:follow_index'
         ))

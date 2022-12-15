@@ -53,7 +53,7 @@ def profile(request, username):
 def post_detail(request, post_id):
     form = CommentForm(request.POST or None)
     post = get_object_or_404(Post, pk=post_id)
-    comments = post.comments.filter(post=post)
+    comments = post.comments.all()
     context = {
         'post_id': post_id,
         'post': post,
@@ -132,6 +132,6 @@ def profile_unfollow(request, username):
     """Отписка"""
     author = get_object_or_404(User, username=username)
     if author != request.user:
-        if Follow.objects.get_or_create(user=request.user, author=author):
+        if Follow.objects.filter(user=request.user, author=author).exists():
             Follow.objects.get(user=request.user, author=author).delete()
     return redirect('posts:follow_index')
