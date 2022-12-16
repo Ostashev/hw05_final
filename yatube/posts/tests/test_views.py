@@ -245,7 +245,7 @@ class PostPagesTest(TestCase):
         response_not_follower = self.authorized_client.get(reverse(
             'posts:follow_index'
         ))
-        self.assertNotIn(self.post, response_not_follower.context["page_obj"])
+        self.assertNotIn(self.post, response_not_follower.context['page_obj'])
 
     def test_unfollow_authorized(self):
         """Проверка отписки авторизованного пользователя"""
